@@ -172,6 +172,8 @@ printf "\n"
 
 #TODO Add Storage Class. Try EBS and NFS(EFS hopefully?)
 # https://docs.aws.amazon.com/eks/latest/userguide/storage-classes.html
+kubectl create -f gp2-storage-class.yaml
+kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
 PROXY_VAR="n"
 read -p "Start kubectl proxy to access dashboard? [yn] " PROXY_VAR
@@ -187,6 +189,11 @@ fi
 # TODO Init Helm
 # This will require that Helm be installed, and the service account be added
 # https://medium.com/@zhaimo/using-helm-to-install-application-onto-aws-eks-36840ff84555
+kubectl create serviceaccount tiller --namespace kube-system
+kubectl apply -f rbac-config.yaml
+helm init --serviceaccount tiller
+kubectl get pods --namespace kube-system | grep tiller
+helm repo update
 
 CONFIRM="n"
 if [ "$CLEANUP" = "cleanup" ]
