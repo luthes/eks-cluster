@@ -9,6 +9,21 @@ NODE_COUNT=$2
 CLEANUP=$3
 SERVICE_ROLE_ARN=arn:aws:iam::905753290725:role/eksServiceRole
 
+CONFIRM="n"
+if [ "$CLEANUP" = "cleanup" ]
+then
+  read -p "Delete cluster and worker boxes? [yn] " CONFIRM 
+  if [ "$CONFIRM" = "y" ]
+  then
+    printf "Deleting EKS Cluster\n"
+    aws eks delete-cluster --name $CLUSTER_NAME 
+    printf "Deleting Worker Cluster\n"
+    aws cloudformation delete-stack --stack-name EKS-$CLUSTER_NAME-Worker-Nodes
+    exit 0
+  fi
+fi
+
+
 # Install AWS IAM Authenticator for Linux
 # TODO Check for Mac?
 printf "Installing AWS Authenticator for Linux\n"
@@ -175,6 +190,15 @@ printf "\n"
 kubectl create -f gp2-storage-class.yaml
 kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
+# TODO Init Helm
+# This will require that Helm be installed, and the service account be added
+# https://medium.com/@zhaimo/using-helm-to-install-application-onto-aws-eks-36840ff84555
+kubectl create serviceaccount tiller --namespace kube-system
+kubectl apply -f rbac-config.yaml
+helm init --service-account tiller
+kubectl get pods --namespace kube-system | grep tiller
+helm repo update
+
 PROXY_VAR="n"
 read -p "Start kubectl proxy to access dashboard? [yn] " PROXY_VAR
 if [ $PROXY_VAR = "y" ]
@@ -185,15 +209,6 @@ then
 else
   printf "\n\nRun \`kubectl proxy\` to start proxy. Dashboard is located at this URL: http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/\n\n"
 fi
-
-# TODO Init Helm
-# This will require that Helm be installed, and the service account be added
-# https://medium.com/@zhaimo/using-helm-to-install-application-onto-aws-eks-36840ff84555
-kubectl create serviceaccount tiller --namespace kube-system
-kubectl apply -f rbac-config.yaml
-helm init --serviceaccount tiller
-kubectl get pods --namespace kube-system | grep tiller
-helm repo update
 
 CONFIRM="n"
 if [ "$CLEANUP" = "cleanup" ]
